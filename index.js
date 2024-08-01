@@ -4,6 +4,7 @@ const cors = require("cors");
 const router = require("./router/index.js");
 const connectDb = require("./utils/db.js");
 const cron = require("node-cron");
+
 connectDb();
 
 const TIME_EXPRESSION = "0 9 * * *";

@@ -20,7 +20,7 @@ const register = async (req, res) => {
       const userExist = await User.findOne({ email });
 
       if (userExist) {
-        return res.status(400).send({ message: "email already exists" });
+        return res.status(400).send({ code: "EMAIL_ALREADY_EXIST" });
       }
 
       const userCreated = await User.create({
@@ -34,12 +34,12 @@ const register = async (req, res) => {
       res.status(201).send({
         success: true,
         data: userCreated,
-        message: "user registred successfully",
+        code: "SUCCESS",
       });
     }
   } catch (error) {
     console.log(error, "error");
-    res.status(500).send({ msg: error });
+    res.status(500).send({ msg: error, code: "ERROR" });
   }
 };
 
@@ -58,7 +58,7 @@ const login = async (req, res) => {
       const userExist = await User.findOne({ email });
       if (!userExist) {
         return res.status(400).send({
-          message: "Invalid Credentials",
+          code: "INVALID_CREDENTIALS",
         });
       }
 
@@ -76,44 +76,20 @@ const login = async (req, res) => {
         expiresIn: TOKEN_DETAILS.ACCESS_TOKEN_EXPIRATION_TIME,
       });
 
-      // refresh token
-
-      const refresh_token = jwt.sign(
-        payload,
-        TOKEN_DETAILS.REFRESH_SECRET_KEY,
-        {
-          expiresIn: TOKEN_DETAILS.REFRESH_TOKEN_EXPIRATION_TIME,
-        }
-      );
-
-      // setting jwt token in cookie
-
-      // if (res.cookie[userExist._id.toString()]) {
-      //   res.cookie[userExist._id.toString()] = "";
-      // }
-      // res.cookie(userExist._id.toString(), token, {
-      //   path: "/",
-      //   expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      //   httpOnly: true,
-      //   sameSite: "lax",
-      // });
-
       if (isPasswordMatch) {
         res.status(200).send({
-          success: true,
           access_token: token,
-          refresh_token: refresh_token,
-          message: "user login successfully",
           userId: userExist._id.toString(),
+          code: "SUCCESS",
         });
       } else {
         return res.status(401).send({
-          message: "Invalid email or passoword",
+          code: "INVALID_CREDENTIALS",
         });
       }
     }
   } catch (error) {
-    res.status(500).send({ msg: error });
+    res.status(500).send({ msg: error, code: "ERROR" });
   }
 };
 
@@ -121,23 +97,30 @@ const login = async (req, res) => {
 //* USER BY ID logic
 // *================================================
 
-const userDetails = async (req, res) => {
+const user = async (req, res) => {
   try {
-    const userExist = await User.findById({ _id: req.user.userId });
-    if (!userExist) {
+    const { userId } = req.user;
+
+    const userResponse = await User.findById({ _id: userId }).lean();
+
+    if (!userResponse) {
       return res.status(400).send({
-        message: "User not found",
+        code: "NOT_FOUND",
       });
     } else {
+      const user = {
+        ...userResponse,
+      };
+      delete user.password;
+
       res.status(200).send({
-        success: true,
-        user: userExist,
-        message: "user found successfully",
+        user,
+        code: "SUCCESS",
       });
     }
   } catch (error) {
     console.log(error, "error");
-    res.status(500).send({ msg: error });
+    res.status(500).send({ msg: error, code: "ERROR" });
   }
 };
 
@@ -146,36 +129,35 @@ const userDetails = async (req, res) => {
 // *================================================
 
 const refreshToken = async (req, res) => {
-  const token = req.body.refresh_token;
+  const { userId } = req.params;
+
+  const token = req?.headers?.authorization?.split(" ")[1];
+
   if (!token) {
     return res.status(200).send({
       success: false,
       message: "A token is required for authorization",
     });
   }
-  try {
-    const decodedUser = jwt.verify(token, TOKEN_DETAILS.REFRESH_SECRET_KEY);
-    if (decodedUser) {
-      const token = jwt.sign(
-        {
-          userId: decodedUser?.userId.toString(),
-        },
-        TOKEN_DETAILS.JWT_SECRET_KEY,
-        {
-          expiresIn: TOKEN_DETAILS.ACCESS_TOKEN_EXPIRATION_TIME,
-        }
-      );
 
-      return res.status(200).send({
-        access_token: token,
-        message: "new token generated successfully",
-      });
-    } else {
-      return res.send({ message: "invalid token" });
-    }
+  try {
+    const token = jwt.sign(
+      {
+        userId: userId,
+      },
+      TOKEN_DETAILS.JWT_SECRET_KEY,
+      {
+        expiresIn: TOKEN_DETAILS.ACCESS_TOKEN_EXPIRATION_TIME,
+      }
+    );
+
+    return res.status(200).send({
+      access_token: token,
+      code: "SUCCESS",
+    });
   } catch (error) {
+    console.log("error: ", error);
     return res.status(400).send({ message: "invalid token" });
   }
 };
-
-module.exports = { login, register, userDetails, refreshToken };
+module.exports = { login, register, user, refreshToken };

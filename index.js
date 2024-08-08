@@ -4,6 +4,7 @@ const cors = require("cors");
 const router = require("./router/index.js");
 const connectDb = require("./utils/db.js");
 const cron = require("node-cron");
+const colors = require("colors");
 
 connectDb();
 
@@ -32,7 +33,7 @@ cron.schedule(TIME_EXPRESSION, () => {
 });
 
 app.listen(PORT, () => {
-  console.log(`server is running at port: ${PORT}`);
+  console.log(`server is running at port: ${PORT}`.bgMagenta);
 });
 
 module.exports = app;
